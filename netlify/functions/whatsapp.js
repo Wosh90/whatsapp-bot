@@ -15,32 +15,42 @@ exports.handler = async (event, context) => {
 
     console.log('Message received:', { message, fromNumber });
 
-    // ✅ 1. GREETING / FIRST MESSAGE
-    if (messageLower.includes('hi') || messageLower.includes('hello') || messageLower.includes('help')) {
-      return sendInteractiveMenu(fromNumber);
+    // ✅ 1. GREETING AUTO-REPLY
+    if (isGreeting(messageLower)) {
+      return sendGreetingResponse(fromNumber);
     }
     
-    // ✅ 2. LOCATION REQUEST (button 1)
+    // ✅ 2. THANKS/GRATITUDE RESPONSE
+    if (isThankYou(messageLower)) {
+      return sendThankYouResponse(fromNumber);
+    }
+    
+    // ✅ 3. LOCATION REQUEST (button 1)
     if (messageLower.includes('location') || messageLower.includes('where') || message === '1') {
       return await sendDriverLocationWithETA(fromNumber);
     }
     
-    // ✅ 3. ETA REQUEST (button 2)
+    // ✅ 4. ETA REQUEST (button 2)
     if (messageLower.includes('eta') || messageLower.includes('time') || messageLower.includes('arrive') || message === '2') {
       return await sendETA(fromNumber);
     }
     
-    // ✅ 4. DRIVER INFO (button 3)
+    // ✅ 5. DRIVER INFO (button 3)
     if (messageLower.includes('driver') || messageLower.includes('contact') || message === '3') {
       return await sendDriverInfo(fromNumber);
     }
     
-    // ✅ 5. SEND LIVE LOCATION (button 4)
+    // ✅ 6. SEND LIVE LOCATION (button 4)
     if (message === '4') {
       return await sendLiveLocation(fromNumber);
     }
     
-    // ✅ 6. DEFAULT - SEND INTERACTIVE MENU
+    // ✅ 7. HELP REQUEST
+    if (messageLower.includes('help') || messageLower.includes('option') || messageLower.includes('menu')) {
+      return sendInteractiveMenu(fromNumber);
+    }
+    
+    // ✅ 8. DEFAULT - SEND INTERACTIVE MENU
     return sendInteractiveMenu(fromNumber);
     
   } catch (error) {
@@ -55,6 +65,73 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+// ✅ GREETING DETECTION
+function isGreeting(message) {
+  const greetings = [
+    'hi', 'hello', 'hey', 'halo', 'hi there', 'good morning',
+    'good afternoon', 'good evening', 'morning', 'afternoon',
+    'evening', 'selamat pagi', 'selamat petang', 'selamat malam'
+  ];
+  return greetings.some(greet => message.includes(greet));
+}
+
+// ✅ THANK YOU DETECTION
+function isThankYou(message) {
+  const thanks = [
+    'thank', 'thanks', 'terima kasih', 'tq', 'thank you',
+    'appreciate', 'grateful', 'cheers'
+  ];
+  return thanks.some(thank => message.includes(thank));
+}
+
+// ✅ GREETING RESPONSE
+function sendGreetingResponse(fromNumber) {
+  const greetingText = `👋 *Hello! Welcome to WOSH Delivery!*\n
+I'm your delivery assistant. I can help you with:\n
+📍 *Track your driver* - Real-time location
+⏱️ *Check ETA* - Estimated arrival time  
+👤 *Driver details* - Contact information
+🗺️ *Live tracking* - Interactive map\n
+*How can I help you today?*\n
+Reply with:
+1️⃣ *Driver Location*
+2️⃣ *Estimated Arrival*  
+3️⃣ *Driver Contact*
+4️⃣ *Live Tracking*\n
+Or simply ask: "Where is my driver?"`;
+
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'text/xml' },
+    body: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>${greetingText}</Message>
+</Response>`
+  };
+}
+
+// ✅ THANK YOU RESPONSE
+function sendThankYouResponse(fromNumber) {
+  const thankYouText = `🙏 *Thank you for choosing WOSH Delivery!*\n
+We appreciate your business! 😊\n
+*Need anything else?*
+• Reply 1 for driver location
+• Reply 2 for ETA
+• Reply 3 for driver contact
+• Reply 4 for live tracking\n
+📞 *Customer Service:* 03-1234 5678
+⏰ *Hours:* 8AM - 10PM Daily`;
+
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'text/xml' },
+    body: `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>${thankYouText}</Message>
+</Response>`
+  };
+}
 
 // ✅ INTERACTIVE MENU WITH BUTTONS
 function sendInteractiveMenu(fromNumber) {
@@ -106,7 +183,11 @@ async function sendDriverLocationWithETA(fromNumber) {
 📞 *Contact:* ${driverLocation.phone}
 ⏱️ *ETA to You:* ${eta.time} (${eta.distance} away)
 📊 *Speed:* ${driverLocation.speed || '45 km/h'}\n
-_Reply "2" for updated ETA or "4" for live tracking_`;
+_Need something else?_
+• Reply 2 for updated ETA
+• Reply 3 for driver info  
+• Reply 4 for live tracking
+• Reply HELP for menu`;
     
     return {
       statusCode: 200,
@@ -154,7 +235,8 @@ async function sendETA(fromNumber) {
 📏 *Distance:* ${eta.distance}
 🚦 *Traffic Condition:* ${eta.traffic}
 📊 *Confidence:* ${eta.confidence}\n
-_Updates every 5 minutes. Reply "1" for live location._`;
+_Updates every 5 minutes._
+_Reply 1 for live location or HELP for menu._`;
     
     return {
       statusCode: 200,
@@ -189,7 +271,8 @@ async function sendDriverInfo(fromNumber) {
 *Rating:* ⭐⭐⭐⭐⭐ (4.8/5)
 *Deliveries Today:* 12/15 completed\n
 📍 _Currently: ${driverLocation?.status || 'En route to your location'}_\n
-📞 *Need help?* Call dispatch: 03-1234 5678`;
+📞 *Need help?* Call dispatch: 03-1234 5678\n
+_Reply 1 for location, 2 for ETA, or 4 for live tracking._`;
   
   return {
     statusCode: 200,
@@ -226,7 +309,8 @@ _or open:_\n
 ${mapsLink}\n
 📍 *Driver is here:* ${driverLocation.lat}, ${driverLocation.lng}
 ⏱️ *Last updated:* Just now\n
-_Note: Location updates every 2 minutes._`;
+_Note: Location updates every 2 minutes._
+_Reply HELP for more options._`;
   
   return {
     statusCode: 200,
@@ -346,4 +430,8 @@ async function getDriverLocation(customerPhone) {
     console.error('Get location error:', error);
     return null;
   }
+}
+    return null;
+  }
+
 }
